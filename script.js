@@ -1,4 +1,3 @@
-// Carrinho de compras da MAETS: armazena os jogos neste navegador.
 document.addEventListener('DOMContentLoaded', () => {
     const chave = 'maets_carrinho';
     const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -156,4 +155,84 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     renderizar();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    const area = document.querySelector('.main');
+    document.querySelectorAll('.menu a[href^="#"]').forEach((link) => {
+        link.addEventListener('click', (evento) => {
+            evento.preventDefault();
+            const alvo = document.getElementById(link.getAttribute('href').slice(1));
+            if (!alvo) return;
+            const rolavel = getComputedStyle(area).overflowY === 'auto';
+            const visivel = rolavel ? area.clientHeight : window.innerHeight;
+            alvo.scrollIntoView({ behavior: 'smooth', block: alvo.offsetHeight < visivel ? 'center' : 'start' });
+        });
+    });
+
+    const carrossel = document.querySelector('.carrossel');
+    if (carrossel) {
+        const INTERVALO = 4000;
+        const slides = [...carrossel.querySelectorAll('.slide')];
+        const pontos = carrossel.querySelector('.carrossel-pontos');
+        let atual = 0;
+        let timer;
+
+        function ir(i) {
+            atual = (i + slides.length) % slides.length;
+            slides.forEach((s, n) => s.classList.toggle('ativo', n === atual));
+            [...pontos.children].forEach((p, n) => p.classList.toggle('ativo', n === atual));
+            iniciar();
+        }
+
+        function iniciar() {
+            clearTimeout(timer);
+            timer = setTimeout(() => ir(atual + 1), INTERVALO);
+        }
+
+        slides.forEach((_, i) => {
+            const ponto = document.createElement('button');
+            ponto.type = 'button';
+            ponto.setAttribute('aria-label', `Ir para a imagem ${i + 1}`);
+            ponto.addEventListener('click', () => ir(i));
+            pontos.appendChild(ponto);
+        });
+
+        carrossel.querySelector('.carrossel-anterior').addEventListener('click', () => ir(atual - 1));
+        carrossel.querySelector('.carrossel-proximo').addEventListener('click', () => ir(atual + 1));
+        carrossel.addEventListener('mouseenter', () => clearTimeout(timer));
+        carrossel.addEventListener('mouseleave', iniciar);
+        ir(0);
+    }
+
+    const perfil = document.querySelector('.profile');
+    const dados = document.getElementById('perfil-dados');
+    const statusPerfil = perfil.querySelector('span');
+
+    function alternarPerfil() {
+        dados.hidden = !dados.hidden;
+        perfil.setAttribute('aria-expanded', String(!dados.hidden));
+    }
+
+    function atualizarStatus() {
+        const online = navigator.onLine;
+        statusPerfil.textContent = online ? '● Online' : '● Offline';
+        perfil.classList.toggle('offline', !online);
+        document.getElementById('perfil-status').textContent = online ? 'Online' : 'Offline';
+    }
+
+    perfil.addEventListener('click', alternarPerfil);
+    perfil.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Enter' || evento.key === ' ') {
+            evento.preventDefault();
+            alternarPerfil();
+        }
+    });
+    window.addEventListener('online', atualizarStatus);
+    window.addEventListener('offline', atualizarStatus);
+    atualizarStatus();
+
+    const nomes = [...document.querySelectorAll('.jogo strong')].map(s => s.textContent.trim());
+    document.getElementById('perfil-jogos').textContent = new Set(nomes).size;
 });
