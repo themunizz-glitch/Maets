@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <title>MAETS - Comunidade</title>
+    <link rel="icon" type="image/x-icon" href="images/logo.png">
+</head>
+
+<body>
+    <div class="maets-page">
+        <div class="main-content">
+            <main class="main">
+
+                <div class="top">
+                    <h1>MAETS</h1>
+                    <div class="top-menu">
+                        <a href="index.html">LOJA</a>
+                        <a href="comunidade.html">COMUNIDADE</a>
+                    </div>
+                </div>
+
+                <h2 class="titulo">Escrever uma review</h2>
+
+                <form class="review-form" id="form-review">
+                    <input type="text" id="jogo" list="jogos-lista" placeholder="Nome do jogo" maxlength="80" required>
+                    <datalist id="jogos-lista"></datalist>
+                    <input type="text" id="autor" placeholder="Seu nome" maxlength="40" required>
+                    <select id="nota" aria-label="Nota">
+                        <option value="5">★★★★★ — Excelente</option>
+                        <option value="4">★★★★☆ — Muito bom</option>
+                        <option value="3">★★★☆☆ — Regular</option>
+                        <option value="2">★★☆☆☆ — Ruim</option>
+                        <option value="1">★☆☆☆☆ — Péssimo</option>
+                    </select>
+                    <textarea id="texto" placeholder="Escreva sua opinião sobre o jogo..." maxlength="800" required></textarea>
+                    <button type="submit">Publicar review</button>
+                </form>
+
+                <h2 class="titulo">Reviews da comunidade</h2>
+
+                <div class="search">
+                    <input type="text" id="filtro" placeholder="Filtrar reviews por jogo...">
+                </div>
+
+                <div id="reviews"></div>
+
+            </main>
+        </div>
+
+        <footer class="footer">
+            <p style="font-size: 11px;">&copy; 2026 MAETS. TODOS OS DIREITOS RESERVADOS.</p>
+        </footer>
+    </div>
+
+    <script>
+    const CHAVE = 'maets_reviews';
+    const sugestoes = ['Elden Ring', 'Cyberpunk 2077', 'The Witcher 3', 'Hollow Knight', 'Hollow Knight: Silksong',
+        'Red Dead Redemption 2', 'Stardew Valley', "Baldur's Gate 3", 'Palworld', 'Valorant', 'Counter-Strike 2', 'Free Fire'];
+    const form = document.getElementById('form-review');
+    const lista = document.getElementById('reviews');
+    const filtro = document.getElementById('filtro');
+    let reviews = [];
+
+    sugestoes.forEach((nome) => {
+        const op = document.createElement('option');
+        op.value = nome;
+        document.getElementById('jogos-lista').appendChild(op);
+    });
+
+    try {
+        reviews = JSON.parse(localStorage.getItem(CHAVE) || '[]');
+        if (!Array.isArray(reviews)) reviews = [];
+    } catch { reviews = []; }
+
+    function salvar() {
+        try { localStorage.setItem(CHAVE, JSON.stringify(reviews)); }
+        catch (erro) { console.warn('Não foi possível salvar as reviews:', erro); }
+    }
+
+    function criar(tag, classe, texto) {
+        const e = document.createElement(tag);
+        if (classe) e.className = classe;
+        if (texto !== undefined) e.textContent = texto;
+        return e;
+    }
+
+    function mostrar() {
+        const termo = filtro.value.trim().toLowerCase();
+        const itens = reviews.filter(r => r.jogo.toLowerCase().includes(termo));
+        lista.replaceChildren();
+        if (!itens.length) lista.appendChild(criar('p', 'carrinho-vazio', 'Nenhuma review por aqui ainda.'));
+        itens.forEach((r) => {
+            const card = criar('div', 'review');
+            const topo = criar('div', 'review-topo');
+            topo.append(criar('strong', '', r.jogo), criar('span', 'estrelas', '★'.repeat(r.nota) + '☆'.repeat(5 - r.nota)));
+            const remover = criar('button', 'review-remover', 'Remover');
+            remover.type = 'button';
+            remover.addEventListener('click', () => {
+                reviews = reviews.filter(x => x.id !== r.id);
+                salvar();
+                mostrar();
+            });
+            const rodape = criar('div', 'review-topo');
+            rodape.append(criar('small', '', `${r.autor} • ${new Date(r.id).toLocaleDateString('pt-BR')}`), remover);
+            card.append(topo, criar('p', '', r.texto), rodape);
+            lista.appendChild(card);
+        });
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        reviews.unshift({
+            id: Date.now(),
+            jogo: document.getElementById('jogo').value.trim(),
+            autor: document.getElementById('autor').value.trim(),
+            nota: Number(document.getElementById('nota').value),
+            texto: document.getElementById('texto').value.trim()
+        });
+        salvar();
+        form.reset();
+        mostrar();
+    });
+
+    filtro.addEventListener('input', mostrar);
+    mostrar();
+    </script>
+</body>
+</html>
