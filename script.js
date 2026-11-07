@@ -161,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderizarBiblioteca() {
         abrirBiblioteca.textContent = `Biblioteca (${biblioteca.length})`;
         telaBiblioteca.querySelector('.biblioteca-contagem').textContent = `${biblioteca.length} jogo(s) adquirido(s) nesta demonstração`;
+        document.getElementById('perfil-jogos').textContent = biblioteca.length;
         gradeBiblioteca.replaceChildren();
         if (!biblioteca.length) {
             const vazio = document.createElement('div');
@@ -405,7 +406,4 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('online', atualizarStatus);
     window.addEventListener('offline', atualizarStatus);
     atualizarStatus();
-
-    const nomes = [...document.querySelectorAll('.jogo strong')].map(s => s.textContent.trim());
-    document.getElementById('perfil-jogos').textContent = new Set(nomes).size;
 });
