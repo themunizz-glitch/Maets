@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const chave = 'maets_carrinho';
+    const chaveBiblioteca = 'maets_biblioteca';
     const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
     const jogos = Array.from(document.querySelectorAll('.jogo'));
     const catalogo = new Map();
@@ -12,7 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const preco = gratuito ? 0 : Number(precoTexto.replace(/[^\d,]/g, '').replace(',', '.'));
         if (!Number.isFinite(preco)) return;
 
-        catalogo.set(nome, { nome, preco });
+        const imagem = cartao.querySelector('img')?.getAttribute('src') || '';
+        catalogo.set(nome, { nome, preco, imagem });
         const botao = document.createElement('button');
         botao.type = 'button';
         botao.className = 'adicionar-carrinho';
@@ -36,6 +38,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let carrinho = carregar();
+    function carregarBiblioteca() {
+        try {
+            const dados = JSON.parse(localStorage.getItem(chaveBiblioteca) || '[]');
+            return Array.isArray(dados) ? [...new Set(dados.filter(nome => typeof nome === 'string' && catalogo.has(nome)))] : [];
+        } catch { return []; }
+    }
+    let biblioteca = carregarBiblioteca();
+    carrinho = carrinho.filter(nome => !biblioteca.includes(nome));
+
 
     const topo = document.querySelector('.top');
     const abrir = document.createElement('button');
@@ -43,6 +54,16 @@ document.addEventListener('DOMContentLoaded', () => {
     abrir.className = 'abrir-carrinho';
     abrir.setAttribute('aria-label', 'Abrir carrinho');
     topo.appendChild(abrir);
+    const abrirBiblioteca = document.createElement('button');
+    abrirBiblioteca.type = 'button';
+    abrirBiblioteca.className = 'abrir-biblioteca';
+    topo.appendChild(abrirBiblioteca);
+    const linkBiblioteca = document.createElement('a');
+    linkBiblioteca.href = '#biblioteca';
+    linkBiblioteca.textContent = 'Minha biblioteca';
+    document.querySelector('.menu')?.appendChild(linkBiblioteca);
+    linkBiblioteca.addEventListener('click', evento => { evento.preventDefault(); mostrarBiblioteca(); });
+
 
     const camada = document.createElement('div');
     camada.className = 'carrinho-camada';
@@ -66,6 +87,153 @@ document.addEventListener('DOMContentLoaded', () => {
     const total = camada.querySelector('.carrinho-total');
     const finalizar = camada.querySelector('.finalizar-carrinho');
     const limpar = camada.querySelector('.limpar-carrinho');
+
+    // Telas adicionais: pagamento demonstrativo e biblioteca de jogos adquiridos.
+    const pagamento = document.createElement('div');
+    pagamento.className = 'maets-modal';
+    pagamento.hidden = true;
+    pagamento.innerHTML = `
+        <section class="maets-dialog maets-checkout" role="dialog" aria-modal="true" aria-labelledby="pagamento-titulo">
+            <div class="maets-modal-topo"><h2 id="pagamento-titulo">Finalizar compra</h2><button class="maets-fechar" type="button" aria-label="Fechar pagamento">✕</button></div>
+            <p class="maets-aviso">Pagamento fictício para demonstração. Nenhum valor será cobrado e nenhum dado bancário será solicitado.</p>
+            <div class="maets-resumo"></div>
+            <div class="maets-total">Total <strong class="pagamento-total"></strong></div>
+            <fieldset class="maets-metodos"><legend>Escolha um método fictício</legend>
+                <label><input type="radio" name="metodo-demonstracao" value="Pix simulado" checked> Pix simulado</label>
+                <label><input type="radio" name="metodo-demonstracao" value="Cartão de teste"> Cartão de teste</label>
+                <label><input type="radio" name="metodo-demonstracao" value="Boleto simulado"> Boleto simulado</label>
+            </fieldset>
+            <p class="maets-erro" role="alert" hidden></p>
+            <div class="maets-acoes"><button class="maets-voltar" type="button">Voltar ao carrinho</button><button class="maets-confirmar" type="button">Simular pagamento</button></div>
+        </section>`;
+    document.body.appendChild(pagamento);
+
+    const telaBiblioteca = document.createElement('div');
+    telaBiblioteca.className = 'maets-biblioteca';
+    telaBiblioteca.hidden = true;
+    telaBiblioteca.innerHTML = `<section class="maets-biblioteca-pagina" role="dialog" aria-modal="true" aria-labelledby="biblioteca-titulo">
+        <header class="maets-biblioteca-topo"><div><p class="maets-sobretitulo">MAETS / JOGOS</p><h2 id="biblioteca-titulo">Minha biblioteca</h2><p class="biblioteca-contagem"></p></div><button class="biblioteca-fechar" type="button">✕ Voltar à loja</button></header>
+        <div class="biblioteca-grade"></div>
+        <p class="maets-jogar-aviso" role="status" hidden></p>
+    </section>`;
+    document.body.appendChild(telaBiblioteca);
+    const erroPagamento = pagamento.querySelector('.maets-erro');
+    const resumoPagamento = pagamento.querySelector('.maets-resumo');
+    const gradeBiblioteca = telaBiblioteca.querySelector('.biblioteca-grade');
+    let origemCheckout = [];
+
+    function guardarBiblioteca() {
+        try { localStorage.setItem(chaveBiblioteca, JSON.stringify(biblioteca)); }
+        catch (erro) { console.warn('Não foi possível salvar a biblioteca:', erro); }
+    }
+    function bloquearRolagem() {
+        document.body.classList.toggle('carrinho-aberto', !camada.hidden || !pagamento.hidden || !telaBiblioteca.hidden);
+    }
+    function fecharPagamento() {
+        pagamento.hidden = true;
+        bloquearRolagem();
+    }
+    function abrirPagamento() {
+        if (!carrinho.length) return;
+        origemCheckout = [...carrinho];
+        resumoPagamento.replaceChildren();
+        let soma = 0;
+        origemCheckout.forEach(nome => {
+            const jogo = catalogo.get(nome);
+            soma += jogo.preco;
+            const linha = document.createElement('div');
+            linha.className = 'maets-resumo-item';
+            const titulo = document.createElement('span');
+            titulo.textContent = nome;
+            const valor = document.createElement('strong');
+            valor.textContent = moeda.format(jogo.preco);
+            linha.append(titulo, valor);
+            resumoPagamento.appendChild(linha);
+        });
+        pagamento.querySelector('.pagamento-total').textContent = moeda.format(soma);
+        pagamento.querySelector('input[name="metodo-demonstracao"]').checked = true;
+        erroPagamento.hidden = true;
+        camada.hidden = true;
+        pagamento.hidden = false;
+        bloquearRolagem();
+        pagamento.querySelector('.maets-fechar').focus();
+    }
+    function renderizarBiblioteca() {
+        abrirBiblioteca.textContent = `Biblioteca (${biblioteca.length})`;
+        telaBiblioteca.querySelector('.biblioteca-contagem').textContent = `${biblioteca.length} jogo(s) adquirido(s) nesta demonstração`;
+        gradeBiblioteca.replaceChildren();
+        if (!biblioteca.length) {
+            const vazio = document.createElement('div');
+            vazio.className = 'biblioteca-vazia';
+            vazio.innerHTML = '<h3>Sua biblioteca está vazia</h3><p>Adicione jogos ao carrinho e finalize uma compra fictícia para encontrá-los aqui.</p>';
+            gradeBiblioteca.appendChild(vazio);
+            return;
+        }
+        biblioteca.forEach(nome => {
+            const jogo = catalogo.get(nome);
+            if (!jogo) return;
+            const card = document.createElement('article');
+            card.className = 'biblioteca-card';
+            const img = document.createElement('img');
+            img.src = jogo.imagem;
+            img.alt = `Capa de ${nome}`;
+            const info = document.createElement('div');
+            info.className = 'biblioteca-card-info';
+            const titulo = document.createElement('strong');
+            titulo.textContent = nome;
+            const status = document.createElement('span');
+            status.textContent = '✓ Já adquirido';
+            const jogar = document.createElement('button');
+            jogar.type = 'button';
+            jogar.textContent = '▶ Jogar';
+            jogar.addEventListener('click', () => {
+                const aviso = telaBiblioteca.querySelector('.maets-jogar-aviso');
+                aviso.textContent = `${nome} está na sua biblioteca. A execução do jogo não está disponível nesta demonstração.`;
+                aviso.hidden = false;
+            });
+            info.append(titulo, status, jogar);
+            card.append(img, info);
+            gradeBiblioteca.appendChild(card);
+        });
+    }
+    function mostrarBiblioteca() {
+        camada.hidden = true;
+        pagamento.hidden = true;
+        telaBiblioteca.hidden = false;
+        telaBiblioteca.querySelector('.maets-jogar-aviso').hidden = true;
+        renderizarBiblioteca();
+        bloquearRolagem();
+        telaBiblioteca.querySelector('.biblioteca-fechar').focus();
+    }
+    function fecharBiblioteca() {
+        telaBiblioteca.hidden = true;
+        bloquearRolagem();
+        abrirBiblioteca.focus();
+    }
+    abrirBiblioteca.addEventListener('click', mostrarBiblioteca);
+    telaBiblioteca.querySelector('.biblioteca-fechar').addEventListener('click', fecharBiblioteca);
+    pagamento.querySelector('.maets-fechar').addEventListener('click', fecharPagamento);
+    pagamento.querySelector('.maets-voltar').addEventListener('click', () => { fecharPagamento(); abrirPainel(); });
+    pagamento.addEventListener('click', evento => { if (evento.target === pagamento) fecharPagamento(); });
+    pagamento.querySelector('.maets-confirmar').addEventListener('click', () => {
+        if (!origemCheckout.length || origemCheckout.some(nome => !carrinho.includes(nome))) {
+            erroPagamento.textContent = 'O carrinho mudou. Volte ao carrinho e confira os itens.';
+            erroPagamento.hidden = false;
+            return;
+        }
+        // Transação apenas local, sem banco, gateway ou processamento financeiro.
+        origemCheckout.forEach(nome => { if (!biblioteca.includes(nome)) biblioteca.push(nome); });
+        carrinho = carrinho.filter(nome => !origemCheckout.includes(nome));
+        guardarBiblioteca();
+        salvar();
+        renderizar();
+        renderizarBiblioteca();
+        fecharPagamento();
+        mostrarBiblioteca();
+        telaBiblioteca.querySelector('.maets-jogar-aviso').textContent = '✓ Pagamento de demonstração aprovado! Os jogos foram adicionados à sua biblioteca.';
+        telaBiblioteca.querySelector('.maets-jogar-aviso').hidden = false;
+    });
+
 
     function salvar() {
         try { localStorage.setItem(chave, JSON.stringify(carrinho)); }
@@ -112,14 +280,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const nome = cartao.querySelector('strong')?.textContent.trim();
             const botao = cartao.querySelector('.adicionar-carrinho');
             if (!botao) return;
+            const adquirido = biblioteca.includes(nome);
             const adicionado = carrinho.includes(nome);
-            botao.disabled = adicionado;
-            botao.textContent = adicionado ? '✓ No carrinho' : catalogo.get(nome).preco === 0 ? 'Adicionar grátis' : 'Adicionar ao carrinho';
+            botao.disabled = adquirido || adicionado;
+            botao.textContent = adquirido ? '✓ Já adquirido' : adicionado ? '✓ No carrinho' : catalogo.get(nome).preco === 0 ? 'Adicionar grátis' : 'Adicionar ao carrinho';
         });
     }
 
     function adicionar(nome) {
-        if (carrinho.includes(nome)) return;
+        if (carrinho.includes(nome) || biblioteca.includes(nome)) return;
         carrinho.push(nome);
         salvar();
         renderizar();
@@ -128,13 +297,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function abrirPainel() {
         camada.hidden = false;
-        document.body.classList.add('carrinho-aberto');
+        bloquearRolagem();
         camada.querySelector('.fechar-carrinho').focus();
     }
 
     function fecharPainel() {
         camada.hidden = true;
-        document.body.classList.remove('carrinho-aberto');
+        bloquearRolagem();
         abrir.focus();
     }
 
@@ -144,17 +313,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (evento.target === camada) fecharPainel();
     });
     document.addEventListener('keydown', (evento) => {
-        if (evento.key === 'Escape' && !camada.hidden) fecharPainel();
+        if (evento.key === 'Escape') {
+            if (!pagamento.hidden) fecharPagamento();
+            else if (!telaBiblioteca.hidden) fecharBiblioteca();
+            else if (!camada.hidden) fecharPainel();
+        }
     });
     limpar.addEventListener('click', () => {
         carrinho = [];
         salvar();
         renderizar();
     });
-    finalizar.addEventListener('click', () => {
-    });
+    finalizar.addEventListener('click', abrirPagamento);
 
     renderizar();
+    renderizarBiblioteca();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
