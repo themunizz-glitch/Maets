@@ -687,10 +687,15 @@ html::-webkit-scrollbar {
 }
 
 .perfil-dados p {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
     gap: 10px;
     color: #aaa;
+}
+
+.perfil-dados strong {
+    text-align: right;
 }
 
 .review-form {
@@ -836,6 +841,7 @@ html::-webkit-scrollbar {
         flex: 1;
         min-width: 0;
         flex-direction: row;
+        align-items: center;
         gap: 4px;
         overflow-x: auto;
     }
